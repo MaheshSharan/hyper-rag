@@ -1,0 +1,37 @@
+# Add these at the end of requirements.txt
+qdrant-client
+opensearch-py
+neo4j
+# Core
+pydantic>=2.0
+python-dotenv
+tqdm
+aiohttp
+asyncio
+
+# Parsing
+tree-sitter
+tree-sitter-python
+tree-sitter-javascript
+# Add more languages later: tree-sitter-java, etc.
+pymupdf                     # For PDFs
+markdown-it-py
+beautifulsoup4
+
+# Vector / Search
+qdrant-client
+opensearch-py
+
+# Graph
+neo4j
+
+# NVIDIA
+langchain-nvidia-ai-endpoints   # Easy client for embeddings + rerank
+# or use direct requests if you prefer no LangChain
+
+# LLM
+openai
+anthropic
+
+# Utils
+tiktoken

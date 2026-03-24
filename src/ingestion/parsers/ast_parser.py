@@ -1,0 +1,71 @@
+from tree_sitter import Language, Parser
+import tree_sitter_python as tspython
+import tree_sitter_javascript as tsjavascript
+from typing import List, Dict
+import hashlib
+
+class ASTParser:
+    """Tree-sitter based parser for code files (updated for tree-sitter >= 0.22)"""
+
+    def __init__(self):
+        # Load languages (new correct way)
+        self.PY_LANGUAGE = Language(tspython.language())
+        self.JS_LANGUAGE = Language(tsjavascript.language())
+
+        # Create parsers with language directly in constructor
+        self.python_parser = Parser(self.PY_LANGUAGE)
+        self.js_parser = Parser(self.JS_LANGUAGE)
+
+    def parse_code(self, code: str, language: str) -> List[Dict]:
+        lang = language.lower()
+        
+        if lang in ["python", "py"]:
+            parser = self.python_parser
+            lang_name = "python"
+        elif lang in ["javascript", "js", "ts"]:   # treat TS as JS for now
+            parser = self.js_parser
+            lang_name = "javascript"
+        else:
+            # Fallback: return full file as one chunk
+            chunk_id = hashlib.md5(code.encode()).hexdigest()[:12]
+            return [{
+                "chunk_id": f"code_{chunk_id}",
+                "text": code,
+                "type": "full_file",
+                "language": lang,
+            }]
+
+        # Parse the code
+        tree = parser.parse(bytes(code, "utf8"))
+
+        chunks = []
+        # Extract top-level functions and classes
+        for node in tree.root_node.children:
+            if node.type in ["function_definition", "class_definition", "method_definition", 
+                           "function_declaration", "class_declaration"]:
+                chunk_text = code[node.start_byte : node.end_byte]
+                if not chunk_text.strip():
+                    continue
+                    
+                chunk_id = hashlib.md5(chunk_text.encode()).hexdigest()[:12]
+
+                chunks.append({
+                    "chunk_id": f"code_{chunk_id}",
+                    "text": chunk_text,
+                    "type": node.type,
+                    "language": lang_name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                })
+
+        # If no meaningful chunks found, fall back to full file
+        if not chunks:
+            chunk_id = hashlib.md5(code.encode()).hexdigest()[:12]
+            chunks.append({
+                "chunk_id": f"code_{chunk_id}",
+                "text": code,
+                "type": "full_file",
+                "language": lang_name,
+            })
+
+        return chunks
