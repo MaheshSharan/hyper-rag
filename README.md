@@ -1,5 +1,7 @@
 # HyperRAG — Advanced Hybrid RAG System
 
+>  ⚠️ This project is in active development. Features and APIs may change. |
+
 Production-grade Retrieval-Augmented Generation with:
 - Structured ingestion (AST + PageIndex + Graph)
 - Hybrid retrieval (BM25 + Vector + Graph)
@@ -61,9 +63,3 @@ python scripts/ingest_folder.py data/raw/
 # Run a test query
 python scripts/query_cli.py "Your question here"
 ```
-
-## Modules
-
-src/ingestion/ — SemTools + Tree-sitter + PageIndex  
-src/retrieval/ — Multi-retriever + NVIDIA reranker + Fusion  
-etc.
