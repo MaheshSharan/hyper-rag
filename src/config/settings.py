@@ -20,8 +20,12 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str
 
     # LLM
-    LLM_PROVIDER: str
-    OPENAI_API_KEY: str
+    LLM_PROVIDER: str = "openai"  # openai, anthropic, nvidia
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    # NVIDIA LLM Specifics
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_LLM_MODEL: str = "moonshotai/kimi-k2-thinking"
 
     class Config:
         env_file = ".env"

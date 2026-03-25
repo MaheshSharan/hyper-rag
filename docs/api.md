@@ -1,85 +1,100 @@
 # HyperRAG — API Documentation
 
-This document describes the endpoints available in the HyperRAG backend.
+Professional-grade API for hybrid document search, code retrieval, and agentic context-gathering.
 
-## Base URL
-`http://127.0.0.1:8000`
+---
+
+## Connection Info
+- **Base URL:** `http://127.0.0.1:8000`
+- **Interactive Documentation:** `http://127.0.0.1:8000/docs` (Swagger UI)
 
 ---
 
 ## Endpoints
 
-### 1. Query Endpoint
+### 1. Hybrid Search & Generation
 `POST /query`
 
-Executes a hybrid search across all indexes and optionally generates an LLM response.
+Executes a parallel, quad-retrieval search (Vector + BM25 + Graph + PageIndex) followed by NVIDIA Reranking and Weighted Fusion.
 
-**Request Body:**
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `query` | `string` | **Required** | The question or search term. |
+| `final_top_k` | `int` | `10` | The number of results to return after fusion. |
+| `include_llm` | `bool` | `False` | Whether to generate an answer (requires an LLM API key). |
+| `stream` | `bool` | `True` | Whether to use Server-Sent Events (SSE). |
+| `weights` | `dict` | `None` | (Optional) Custom fusion weights. |
+
+#### **Example Request:**
 ```json
 {
-  "query": "What does the hello_world function do?",
-  "final_top_k": 10,
-  "include_llm": false,
-  "stream": true
+  "query": "What is the payment verification logic?",
+  "final_top_k": 8,
+  "include_llm": true,
+  "stream": true,
+  "weights": {
+    "rerank_score": 0.40,
+    "bm25_score": 0.20,
+    "vector_score": 0.25,
+    "graph_score": 0.15
+  }
 }
 ```
 
-**Parameters:**
-- `query` (string): The user's question or search term.
-- `final_top_k` (int): Number of top results to return after fusion.
-- `include_llm` (bool): If `false`, returns only chunks/context (perfect for IDE extensions). If `true`, requires an LLM API key.
-- `stream` (bool): If `true`, returns a Server-Sent Events (SSE) stream.
-
-**Use Cases:**
-- **Retrieval-Only:** Set `include_llm: false` to get the raw context for your own local LLM.
-- **Full RAG:** Set `include_llm: true` for a complete streaming answer.
+#### **Real-time Thinking Support:**
+If using a thinking-capable LLM, the stream will include reasoning-tokens interleaved with content. These tokens are prefixed with a thinking tag (e.g., [THINKING] or emoji-like indicator) in the content delta as provided by the model provider.
 
 ---
 
-### 2. Index Codebase (Live Progress)
+### 2. Live Ingestion
 `POST /ingest`
 
-Scans a local directory and indexes all supported files into Qdrant, OpenSearch, and Neo4j.
+Scans a folder and builds the multi-index project scope. Files are automatically organized into project-scoped subfolders under data/processed/{folder_name}/.
 
-**Request Body:**
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `folder_path` | `string` | **Required** | The absolute path to the directory. |
+
+#### **Progress SSE Stream:**
+Returns a stream of progress status events:
 ```json
 {
-  "folder_path": "D:/Projects/my-codebase"
+  "status": "progress",
+  "progress": 45,
+  "file": "verify-payment.ts",
+  "chunks": 12,
+  "pageindex_nodes": 3
 }
 ```
 
-**Response:**
-Returns a **Server-Sent Event (SSE)** stream with real-time progress:
-- `status`: "started", "progress", "completed", or "error"
-- `progress`: Integer (0–100)
-- `file`: Path of the file currently being processed
-- `chunks`: Number of chunks created for the file
-- `pageindex_nodes`: Number of PageIndex tree nodes created
-
 ---
 
-### 3. Health Check
+### 3. Service Health Check
 `GET /health`
 
-Returns the current health status of the service and confirms if LLM features are enabled.
+Checks the status of the RAG engine and its connected LLM provider.
 
-**Response Example:**
+#### **Response:**
 ```json
 {
   "status": "healthy",
   "llm_enabled": true,
-  "llm_provider": "openai"
+  "llm_provider": "nvidia"
 }
 ```
 
 ---
 
-## Integration Guide for VS Code Extensions
+## Integration Patterns
 
-1. **Indexing:** Call `/ingest` when the user clicks an "Index Codebase" button. Listen to the SSE stream to update your progress bar.
-2. **Context Retrieval:** Call `/query` with `include_llm: false` to get the ranked context and chunks.
-3. **Local LLM:** Take the returned `context` and pass it to your extension's own LLM provider (like Copilot, Ollama, or a custom model).
+### 1. Retrieval-only (Extension Mode)
+If you are building an IDE extension and have your own local LLM (e.g., Ollama or Copilot-integrated), set `include_llm: false`. You will receive high-relevance chunks and a pre-built context string that you can inject directly into your local prompt.
 
-### Swagger UI
-Full interactive documentation and testing is available at:
-`http://127.0.0.1:8000/docs`
+### 2. Agentic Ingestion
+Integrate /ingest into your project setup workflow. Monitor the progress field to update your UI's progress bar in real-time.
+
+### 3. Manual Override Weights
+For code-heavy searches, increase graph_score. For keyword-heavy legacy documentation, increase bm25_score. The system defaults are optimized for modern codebases (0.35 Rerank, 0.25 Vector, 0.25 BM25, 0.15 Graph).
+
+---
+© 2026 HyperRAG | Precision-Engineered.

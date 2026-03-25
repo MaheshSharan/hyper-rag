@@ -1,10 +1,12 @@
-
+import logging
+import uuid
+from typing import List
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from src.config.settings import settings
 from src.core.schemas import DocumentChunk
-import uuid
-from typing import List
+
+logger = logging.getLogger("hyperrag.qdrant")
 
 class QdrantIndexer:
     def __init__(self):
@@ -14,23 +16,25 @@ class QdrantIndexer:
             timeout=60
         )
         self.collection_name = "hyper_rag_chunks"
-        self.vector_size = 2048   # ← Changed to match NVIDIA model
+        self.vector_size = 2048 
 
     def ensure_collection(self):
         """Create or recreate collection with correct dimension"""
-        collections = self.client.get_collections().collections
-        exists = any(c.name == self.collection_name for c in collections)
+        try:
+            collections = self.client.get_collections().collections
+            exists = any(c.name == self.collection_name for c in collections)
 
-        if exists:
-            # Delete old collection with wrong dimension
-            self.client.delete_collection(self.collection_name)
-            print(f"🗑️  Deleted old Qdrant collection (wrong dimension)")
+            if exists:
+                self.client.delete_collection(self.collection_name)
+                logger.info(f"🗑️  Deleted old Qdrant collection")
 
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
-        )
-        print(f"✅ Created Qdrant collection '{self.collection_name}' with dimension {self.vector_size}")
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
+            )
+            logger.info(f"✅ Created Qdrant collection '{self.collection_name}' with dimension {self.vector_size}")
+        except Exception as e:
+            logger.error(f"❌ Qdrant setup failed: {e}")
 
     def index_chunks(self, chunks: List[DocumentChunk]):
         if not chunks:
@@ -46,7 +50,7 @@ class QdrantIndexer:
                 vector=chunk.embedding,
                 payload={
                     "chunk_id": chunk.chunk_id,
-                    "text": chunk.text[:50000],   # safety
+                    "text": chunk.text[:50000], 
                     "source": chunk.metadata.source,
                     "file_type": chunk.metadata.file_type,
                     "language": chunk.metadata.language,
@@ -61,4 +65,4 @@ class QdrantIndexer:
                 points=points,
                 wait=True
             )
-            print(f"   → Upserted {len(points)} vectors to Qdrant (dim={self.vector_size})")
+            logger.info(f"   → Upserted {len(points)} vectors to Qdrant (dim={self.vector_size})")

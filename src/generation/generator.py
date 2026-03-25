@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import AsyncGenerator, Optional
 
 from openai import AsyncOpenAI, APIError
@@ -19,8 +20,14 @@ class LLMGenerator:
         elif self.llm_provider == "anthropic" and settings.ANTHROPIC_API_KEY:
             self.client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
             logger.info("✅ LLM Generator initialized with Anthropic")
+        elif self.llm_provider == "nvidia" and settings.NVIDIA_API_KEY:
+            self.client = AsyncOpenAI(
+                api_key=settings.NVIDIA_API_KEY,
+                base_url=settings.NVIDIA_BASE_URL
+            )
+            logger.info(f"✅ LLM Generator initialized with NVIDIA ({settings.NVIDIA_LLM_MODEL})")
         else:
-            logger.warning("⚠️ No valid LLM API key found. Running in retrieval-only mode.")
+            logger.warning("⚠️ No valid LLM API key found or provider mismatch. Running in retrieval-only mode.")
 
     async def generate(self, query: str, context: str) -> str:
         """Non-streaming generation (fallback)"""
@@ -28,15 +35,16 @@ class LLMGenerator:
             return "LLM is disabled. Running in retrieval-only mode."
 
         try:
-            if self.llm_provider == "openai":
+            if self.llm_provider == "openai" or self.llm_provider == "nvidia":
+                model = settings.NVIDIA_LLM_MODEL if self.llm_provider == "nvidia" else "gpt-4o"
                 response = await self.client.chat.completions.create(
-                    model="gpt-4o",
+                    model=model,
                     messages=[
                         {"role": "system", "content": self._get_system_prompt()},
                         {"role": "user", "content": self._build_user_prompt(query, context)}
                     ],
-                    temperature=0.3,
-                    max_tokens=1024
+                    temperature=1.0 if self.llm_provider == "nvidia" else 0.3,
+                    max_tokens=4096 if self.llm_provider == "nvidia" else 1024
                 )
                 return response.choices[0].message.content.strip()
 
@@ -58,25 +66,34 @@ class LLMGenerator:
             return "Sorry, I encountered an error while generating the answer."
 
     async def generate_stream(self, query: str, context: str) -> AsyncGenerator[str, None]:
-        """Streaming generation - yields token by token (OpenAI compatible)"""
+        """Streaming generation - yields token by token (OpenAI/NVIDIA compatible)"""
         if not self.client:
             yield "LLM is disabled (retrieval-only mode). Context is ready above."
             return
 
         try:
-            if self.llm_provider == "openai":
+            if self.llm_provider == "openai" or self.llm_provider == "nvidia":
+                model = settings.NVIDIA_LLM_MODEL if self.llm_provider == "nvidia" else "gpt-4o"
                 stream = await self.client.chat.completions.create(
-                    model="gpt-4o",
+                    model=model,
                     messages=[
                         {"role": "system", "content": self._get_system_prompt()},
                         {"role": "user", "content": self._build_user_prompt(query, context)}
                     ],
-                    temperature=0.3,
-                    max_tokens=1024,
+                    temperature=1.0 if self.llm_provider == "nvidia" else 0.3,
+                    max_tokens=4096 if self.llm_provider == "nvidia" else 1024,
                     stream=True
                 )
 
                 async for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    
+                    # Special check for NVIDIA Kimi reasoning content
+                    reasoning = getattr(chunk.choices[0].delta, "reasoning_content", None)
+                    if reasoning:
+                        yield f"💭 {reasoning}"
+                    
                     if chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
 
@@ -100,10 +117,15 @@ class LLMGenerator:
             yield "\n\n[Sorry, an error occurred while streaming the answer.]"
 
     def _get_system_prompt(self) -> str:
-        return """You are a highly accurate and helpful coding assistant.
+        prompt = """You are a highly accurate and helpful coding assistant.
 Use ONLY the provided context to answer the question.
 Be precise, concise, and technical when appropriate.
 If the context does not contain enough information, clearly state that."""
+        
+        if self.llm_provider == "nvidia":
+            prompt = "You are Kimi, an AI assistant created by Moonshot AI. " + prompt
+            
+        return prompt
 
     def _build_user_prompt(self, query: str, context: str) -> str:
         return f"""Context:

@@ -1,39 +1,35 @@
-# Add these at the end of requirements.txt
-qdrant-client
-opensearch-py
-neo4j
-# Core
-pydantic>=2.0
-python-dotenv
-tqdm
-aiohttp
-asyncio
+# --- Core API & Async ---
 fastapi
 uvicorn[standard]
+pydantic>=2.0
+python-dotenv
+aiohttp
+asyncio
+tiktoken
 
-# Parsing
-tree-sitter
+# --- Advanced Parsers (Tree-Sitter) ---
+tree-sitter>=0.23.0
 tree-sitter-python
 tree-sitter-javascript
-# Add more languages later: tree-sitter-java, etc.
-pymupdf                     # For PDFs
+# tree-sitter-typescript  # Install if needing .ts-specific grammar
+
+# --- Document Handling ---
+pymupdf
 markdown-it-py
 beautifulsoup4
 
-# Vector / Search
+# --- Vector & Keyword Search ---
 qdrant-client
 opensearch-py
 
-# Graph
+# --- Graph Database ---
 neo4j
 
-# NVIDIA
-langchain-nvidia-ai-endpoints   # Easy client for embeddings + rerank
-# or use direct requests if you prefer no LangChain
-
-# LLM
+# --- LLM Providers ---
 openai
 anthropic
+langchain-nvidia-ai-endpoints
 
-# Utils
-tiktoken
+# --- CLI & Aesthetics ---
+tqdm
+colorama
