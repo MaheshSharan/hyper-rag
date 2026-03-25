@@ -8,6 +8,8 @@ python-dotenv
 tqdm
 aiohttp
 asyncio
+fastapi
+uvicorn[standard]
 
 # Parsing
 tree-sitter

@@ -1,24 +1,18 @@
-# HyperRAG — Advanced Hybrid RAG System
+# HyperRAG — Advanced Hybrid RAG Backend
 
->  ⚠️ This project is in active development. Features and APIs may change. |
+Production-grade hybrid RAG system with structured ingestion, multi-retrieval, NVIDIA reranking, graph truth layer, and intelligent fusion.
 
-Production-grade Retrieval-Augmented Generation with:
-- Structured ingestion (AST + PageIndex + Graph)
-- Hybrid retrieval (BM25 + Vector + Graph)
-- NVIDIA reranking + intelligent fusion
-- Selective PageIndex reasoning
-- Graph as truth layer
+Designed as a **portable backend** for VS Code extensions, IDEs, and CLI tools. It provides a robust context-gathering engine that can be used independently of any specific LLM.
 
 ## Architecture
 
-**Pipeline Overview:**
-- Raw data (code, docs, PDFs, logs)
-	→ SemTools parser (clean + structured)
-		→ AST parser, Text cleaner, PageIndex builder
-			→ BM25 (OpenSearch), Vector DB (Qdrant), Graph DB (Neo4j)
-				→ Hybrid retrieval, NVIDIA reranking, Fusion
-
-(Arch Diag)
+User Query / IDE
+↓
+[ /query ] → Query Planner → BM25 + Vector + Graph + PageIndex
+↓
+NVIDIA Reranker → Fusion Layer (Weighted Fusion)
+↓
+Context Builder → [Optional] LLM Generator
 
 ```mermaid
 flowchart TD
@@ -49,17 +43,29 @@ flowchart TD
 	E3 --> F3["Graph DB Neo4j"]
 ```
 
+## Features
+- **Hybrid Retrieval:** BM25 + Vector + Graph + Selective PageIndex.
+- **Dynamic Truth Layer:** Neo4j for relationship-based knowledge.
+- **Live Indexing:** Real-time progress (SSE) for easy integration into IDE progress bars.
+- **Retrieval-Only Mode:** Use the system as a pure context-builder (no LLM key required).
+- **Quality Gate:** NVIDIA reranking ensures higher accuracy before context construction.
+
+## Documentation
+For detailed endpoint specifications, request/response examples, and integration patterns, see the [API Documentation](docs/api.md).
+
 ## Quick Start
 
 ```bash
-cp .env.example .env
-# Fill your NVIDIA API key, OpenSearch/Qdrant/Neo4j credentials
+# 1. Start databases
+docker-compose up -d
 
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# Ingest sample data
-python scripts/ingest_folder.py data/raw/
+# 3. Add your keys in .env (if using LLM)
 
-# Run a test query
-python scripts/query_cli.py "Your question here"
+# 4. Start API server
+python src/main.py --api
 ```
+
+**Interactive API Docs (Swagger):** `http://127.0.0.1:8000/docs`

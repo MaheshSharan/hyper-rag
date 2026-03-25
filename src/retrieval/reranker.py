@@ -17,8 +17,15 @@ class NvidiaReranker:
         if not candidates:
             return []
 
+
+        # Filter out candidates with empty or whitespace-only text
+        filtered_candidates = [c for c in candidates if c.get("text") and c["text"].strip()]
+        if not filtered_candidates:
+            print("⚠️ All candidates have empty text. Skipping reranker.")
+            return []
+
         # Convert dicts to LangChain Document objects
-        docs = [Document(page_content=c["text"], metadata={"chunk_id": c["chunk_id"]}) for c in candidates]
+        docs = [Document(page_content=c["text"], metadata={"chunk_id": c["chunk_id"]}) for c in filtered_candidates]
 
         try:
             # Run reranker
