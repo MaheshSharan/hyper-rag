@@ -1,4 +1,8 @@
+import logging
 from typing import List, Dict, Any
+
+logger = logging.getLogger("hyperrag.fusion")
+
 
 def fuse_scores(candidates: List[Dict[str, Any]], weights: Dict[str, float] = None) -> List[Dict[str, Any]]:
     """
@@ -26,6 +30,6 @@ def fuse_scores(candidates: List[Dict[str, Any]], weights: Dict[str, float] = No
     candidates.sort(key=lambda x: x.get("final_score", 0.0), reverse=True)
     
     if candidates:
-        print(f"✅ Fusion completed - Top score: {candidates[0].get('final_score', 0)}")
+        logger.info(f"Fusion completed - Top score: {candidates[0].get('final_score', 0)}")
         
     return candidates

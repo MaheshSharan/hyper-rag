@@ -1,7 +1,11 @@
+import logging
 from langchain_nvidia_ai_endpoints import NVIDIARerank
 from langchain_core.documents import Document
 from src.config.settings import settings
 from typing import List, Dict, Any
+
+logger = logging.getLogger("hyperrag.reranker")
+
 
 class NvidiaReranker:
     def __init__(self):
@@ -17,11 +21,10 @@ class NvidiaReranker:
         if not candidates:
             return []
 
-
         # Filter out candidates with empty or whitespace-only text
         filtered_candidates = [c for c in candidates if c.get("text") and c["text"].strip()]
         if not filtered_candidates:
-            print("⚠️ All candidates have empty text. Skipping reranker.")
+            logger.warning("All candidates have empty text. Skipping reranker.")
             return []
 
         # Convert dicts to LangChain Document objects
@@ -49,12 +52,11 @@ class NvidiaReranker:
                     c_copy["rerank_score"] = 0.0
                     reranked.append(c_copy)
 
-            print(f"✅ NVIDIA Reranker applied successfully on {len(reranked)} candidates")
+            logger.info(f"NVIDIA Reranker applied successfully on {len(reranked)} candidates")
             return reranked
 
         except Exception as e:
-            print(f"⚠️ NVIDIA Reranker failed: {e}")
-            print("   Falling back to original order with dummy rerank scores (0.5)")
+            logger.warning(f"NVIDIA Reranker failed: {e}. Falling back to original order with dummy scores (0.5)")
             
             # Safe fallback
             reranked = []

@@ -1,20 +1,16 @@
-from opensearchpy import OpenSearch
-from src.config.settings import settings
+import logging
+from src.core.connection_pool import connection_pool
 from typing import List, Dict, Any
-import time
+
+logger = logging.getLogger("hyperrag.bm25_retriever")
+
 
 class BM25Retriever:
     def __init__(self):
-        self.client = OpenSearch(
-            hosts=[settings.OPENSEARCH_HOST],
-            http_auth=(settings.OPENSEARCH_USER, settings.OPENSEARCH_PASSWORD),
-            verify_certs=False,
-            timeout=15
-        )
         self.index_name = "hyper_rag_bm25"
 
     def retrieve(self, query: str, top_k: int = 50) -> List[Dict[str, Any]]:
-        """BM25 keyword search - production ready"""
+        """BM25 keyword search"""
         try:
             body = {
                 "query": {
@@ -26,7 +22,7 @@ class BM25Retriever:
                 },
                 "size": top_k
             }
-            response = self.client.search(index=self.index_name, body=body, request_timeout=10)
+            response = connection_pool.opensearch.search(index=self.index_name, body=body, request_timeout=10)
             
             results = []
             for hit in response["hits"]["hits"]:
@@ -39,8 +35,10 @@ class BM25Retriever:
                     "bm25_score": hit["_score"],
                     "metadata": {"retriever": "bm25"}
                 })
+            
+            logger.debug(f"BM25 retriever: {len(results)} results")
             return results
 
         except Exception as e:
-            print(f"❌ BM25 error: {e}")
+            logger.error(f"BM25 error: {e}")
             return []

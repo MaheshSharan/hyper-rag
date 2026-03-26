@@ -1,9 +1,13 @@
+import logging
 from src.retrieval.retrievers.bm25_retriever import BM25Retriever
 from src.retrieval.retrievers.vector_retriever import VectorRetriever
 from src.retrieval.retrievers.graph_retriever import GraphRetriever
 from src.retrieval.retrievers.pageindex_router import PageIndexRouter
 from typing import List, Dict, Any
 import asyncio
+
+logger = logging.getLogger("hyperrag.planner")
+
 
 class QueryPlanner:
     def __init__(self):
@@ -35,5 +39,5 @@ class QueryPlanner:
                     seen.add(cid)
                     all_candidates.append(item)
 
-        print(f"🔍 Candidate pool built: {len(all_candidates)} unique chunks from all retrievers")
+        logger.info(f"Candidate pool built: {len(all_candidates)} unique chunks from all retrievers")
         return all_candidates

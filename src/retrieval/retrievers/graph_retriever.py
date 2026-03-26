@@ -1,21 +1,18 @@
-from neo4j import GraphDatabase
-from src.config.settings import settings
+import logging
+from src.core.connection_pool import connection_pool
 from typing import List, Dict, Any
+
+logger = logging.getLogger("hyperrag.graph_retriever")
+
 
 class GraphRetriever:
     def __init__(self):
-        self.driver = GraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
-        )
-
-    def close(self):
-        self.driver.close()
+        pass  # Using connection pool, no need to store driver
 
     def retrieve(self, user_query: str, top_k: int = 30) -> List[Dict[str, Any]]:
-        """Graph expansion + centrality boost - fixed parameter conflict"""
+        """Graph expansion + centrality boost"""
         try:
-            with self.driver.session() as session:
+            with connection_pool.neo4j.session() as session:
                 result = session.run("""
                     MATCH (c:Chunk)
                     WHERE c.text CONTAINS $q OR ANY(k IN $keywords WHERE c.text CONTAINS k)
@@ -40,8 +37,10 @@ class GraphRetriever:
                         "graph_score": float(record["graph_score"]),
                         "metadata": {"retriever": "graph"}
                     })
+                
+                logger.debug(f"Graph retriever: {len(results)} results")
                 return results
 
         except Exception as e:
-            print(f"❌ Graph retriever error: {e}")
+            logger.error(f"Graph retriever error: {e}")
             return []

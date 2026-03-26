@@ -45,6 +45,8 @@ from src.indexing.qdrant_index import QdrantIndexer
 from src.indexing.opensearch_index import OpenSearchIndexer
 from src.indexing.neo4j_graph import Neo4jGraphBuilder
 from src.core.ignore_filter import IgnoreFilter
+from src.core.connection_pool import connection_pool
+from src.core.metrics import metrics_collector
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -258,6 +260,19 @@ async def list_tools() -> list[types.Tool]:
                 "required": ["confirm"],
             },
         ),
+        
+        types.Tool(
+            name="get_metrics",
+            description=(
+                "Get performance metrics and statistics about retrieval operations. "
+                "Shows average query time, per-retriever performance, and cache hit rates."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
     ]
 
 
@@ -282,6 +297,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
             return await _handle_list_projects()
         elif name == "wipe_project_index":
             return await _handle_wipe(arguments)
+        elif name == "get_metrics":
+            return await _handle_metrics()
         else:
             return [types.TextContent(type="text", text=f"❌ Unknown tool: {name}")]
 
@@ -500,10 +517,7 @@ async def _handle_health() -> list[types.TextContent]:
 
     # ── Qdrant ────────────────────────────────────────────────────────────────
     try:
-        from qdrant_client import QdrantClient
-        client = QdrantClient(url=settings.QDRANT_HOST, timeout=5)
-        col_info = client.get_collection("hyper_rag_chunks")
-        # Use points_count instead of deprecated vectors_count
+        col_info = connection_pool.qdrant.get_collection("hyper_rag_chunks")
         results["qdrant"] = {
             "status": "✅ healthy",
             "points_count": col_info.points_count,
@@ -513,14 +527,7 @@ async def _handle_health() -> list[types.TextContent]:
 
     # ── OpenSearch ────────────────────────────────────────────────────────────
     try:
-        from opensearchpy import OpenSearch
-        os_client = OpenSearch(
-            hosts=[settings.OPENSEARCH_HOST],
-            http_auth=(settings.OPENSEARCH_USER, settings.OPENSEARCH_PASSWORD),
-            verify_certs=False,
-            timeout=5,
-        )
-        stats = os_client.indices.stats(index="hyper_rag_bm25")
+        stats = connection_pool.opensearch.indices.stats(index="hyper_rag_bm25")
         doc_count = stats["_all"]["primaries"]["docs"]["count"]
         results["opensearch"] = {"status": "✅ healthy", "document_count": doc_count}
     except Exception as e:
@@ -528,12 +535,9 @@ async def _handle_health() -> list[types.TextContent]:
 
     # ── Neo4j ─────────────────────────────────────────────────────────────────
     try:
-        from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD))
-        with driver.session() as session:
+        with connection_pool.neo4j.session() as session:
             chunk_count = session.run("MATCH (c:Chunk) RETURN count(c) AS n").single()["n"]
             entity_count = session.run("MATCH (e:Entity) RETURN count(e) AS n").single()["n"]
-        driver.close()
         results["neo4j"] = {
             "status": "✅ healthy",
             "chunk_nodes": chunk_count,
@@ -560,7 +564,6 @@ async def _handle_health() -> list[types.TextContent]:
         lines.append("")
 
     return [types.TextContent(type="text", text="\n".join(lines))]
-
 
 async def _handle_list_projects() -> list[types.TextContent]:
     processed_dir = _PROJECT_ROOT / "data" / "processed"
@@ -660,6 +663,28 @@ async def _handle_wipe(args: dict) -> list[types.TextContent]:
     lines.append("\nAll indexes cleared. You can now re-ingest with `ingest_folder`.")
     return [types.TextContent(type="text", text="\n".join(lines))]
 
+
+async def _handle_metrics() -> list[types.TextContent]:
+    """Get performance metrics"""
+    summary = metrics_collector.get_summary()
+    
+    if "message" in summary:
+        return [types.TextContent(type="text", text=summary["message"])]
+    
+    lines = ["# HyperRAG Performance Metrics\n"]
+    lines.append(f"**Total Queries:** {summary.get('total_queries', 0)}")
+    lines.append(f"**Average Query Time:** {summary.get('avg_query_time', 0)}s\n")
+    
+    lines.append("## Per-Retriever Performance\n")
+    lines.append("| Retriever | Avg Time (s) | Avg Results | Total Calls |")
+    lines.append("|-----------|--------------|-------------|-------------|")
+    
+    for name, stats in summary.get("retrievers", {}).items():
+        lines.append(
+            f"| {name} | {stats['avg_time']:.3f} | {stats['avg_results']:.1f} | {stats['total_calls']} |"
+        )
+    
+    return [types.TextContent(type="text", text="\n".join(lines))]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ENTRY POINT

@@ -1,6 +1,5 @@
 import logging
-from neo4j import GraphDatabase
-from src.config.settings import settings
+from src.core.connection_pool import connection_pool
 from src.core.schemas import DocumentChunk
 import tree_sitter
 from tree_sitter import Language, Parser
@@ -10,12 +9,9 @@ from typing import List
 
 logger = logging.getLogger("hyperrag.neo4j")
 
+
 class Neo4jGraphBuilder:
     def __init__(self):
-        self.driver = GraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
-        )
         self.database = "neo4j"
         
         # Load languages for Tree-Sitter
@@ -25,24 +21,25 @@ class Neo4jGraphBuilder:
             
             self.python_parser = Parser(self.PY_LANGUAGE)
             self.js_parser = Parser(self.JS_LANGUAGE)
-            logger.info("✅ Tree-Sitter parsers initialized for Neo4j Graph Builder")
+            logger.info("Tree-Sitter parsers initialized for Neo4j Graph Builder")
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Tree-Sitter: {e}")
+            logger.error(f"Failed to initialize Tree-Sitter: {e}")
             self.python_parser = None
             self.js_parser = None
 
     def close(self):
-        self.driver.close()
+        """No-op: connection pool handles cleanup"""
+        pass
 
     def ensure_constraints(self):
-        with self.driver.session(database=self.database) as session:
+        with connection_pool.neo4j.session(database=self.database) as session:
             session.run("CREATE CONSTRAINT chunk_id IF NOT EXISTS FOR (c:Chunk) REQUIRE c.chunk_id IS UNIQUE")
             session.run("CREATE CONSTRAINT file_name IF NOT EXISTS FOR (f:File) REQUIRE f.name IS UNIQUE")
             session.run("CREATE CONSTRAINT entity_name IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE")
-        logger.info("✅ Neo4j constraints created")
+        logger.info("Neo4j constraints created")
 
     def build_graph_from_chunks(self, chunks: List[DocumentChunk], file_name: str):
-        with self.driver.session(database=self.database) as session:
+        with connection_pool.neo4j.session(database=self.database) as session:
             session.run("""
                 MERGE (f:File {name: $file_name})
                 SET f.file_type = $file_type, f.last_indexed = timestamp()

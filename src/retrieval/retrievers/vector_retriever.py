@@ -1,21 +1,22 @@
-from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct
-from src.config.settings import settings
+import logging
+from src.core.connection_pool import connection_pool
 from src.ingestion.embedder import Embedder
 from typing import List, Dict, Any
 
+logger = logging.getLogger("hyperrag.vector_retriever")
+
+
 class VectorRetriever:
     def __init__(self):
-        self.client = QdrantClient(url=settings.QDRANT_HOST, timeout=15)
         self.collection_name = "hyper_rag_chunks"
         self.embedder = Embedder()
 
     def retrieve(self, query: str, top_k: int = 50) -> List[Dict[str, Any]]:
-        """Vector search with NVIDIA embeddings - fixed for current Qdrant client"""
+        """Vector search with NVIDIA embeddings"""
         try:
             query_vector = self.embedder.embed_texts([query])[0]
 
-            results = self.client.query_points(
+            results = connection_pool.qdrant.query_points(
                 collection_name=self.collection_name,
                 query=query_vector,
                 limit=top_k,
@@ -33,8 +34,10 @@ class VectorRetriever:
                     "vector_score": float(point.score),
                     "metadata": {"retriever": "vector"}
                 })
+            
+            logger.debug(f"Vector retriever: {len(retrieved)} results")
             return retrieved
 
         except Exception as e:
-            print(f"❌ Vector search error: {e}")
+            logger.error(f"Vector search error: {e}")
             return []

@@ -1,5 +1,9 @@
+import logging
 from typing import List, Dict, Any
 import tiktoken
+
+logger = logging.getLogger("hyperrag.context")
+
 
 class ContextBuilder:
     def __init__(self, max_tokens: int = 12000):
@@ -33,5 +37,5 @@ class ContextBuilder:
 
         context = "".join(context_parts)
 
-        print(f"✅ Context built: {len(context_parts)} chunks | ~{current_tokens} tokens")
+        logger.info(f"Context built: {len(context_parts)} chunks | ~{current_tokens} tokens")
         return context

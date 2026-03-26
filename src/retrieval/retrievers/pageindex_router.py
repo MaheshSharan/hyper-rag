@@ -1,6 +1,10 @@
 import json
+import logging
 from pathlib import Path
 from typing import List, Dict, Any
+
+logger = logging.getLogger("hyperrag.pageindex_router")
+
 
 class PageIndexRouter:
     def __init__(self):
@@ -33,8 +37,9 @@ class PageIndexRouter:
 
             # Sort + limit
             candidates.sort(key=lambda x: x.get("pageindex_score", 0), reverse=True)
+            logger.debug(f"PageIndex router: {len(candidates[:top_k])} results")
             return candidates[:top_k]
 
         except Exception as e:
-            print(f"❌ PageIndex router error: {e}")
+            logger.error(f"PageIndex router error: {e}")
             return []
