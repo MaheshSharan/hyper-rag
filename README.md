@@ -94,4 +94,4 @@ Fine-tune the relevance model via the /query API using the weights object. Defau
 For detailed specifications, see the [API Documentation](docs/api.md).
 
 ---
-© 2026 HyperRAG | Precision-Engineered.
+© 2026 HyperRAG

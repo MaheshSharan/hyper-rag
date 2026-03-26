@@ -1,0 +1,16 @@
+{
+  "preferences": {
+    "coworkScheduledTasksEnabled": false,
+    "sidebarMode": "chat"
+  },
+  "mcpServers": {
+    "hyper-rag": {
+      "command": "D:\\Projects\\hyper-rag\\venv\\Scripts\\python.exe",
+      "args": ["D:\\Projects\\hyper-rag\\mcp_server\\run_server.py"],
+      "env": {
+        "PYTHONPATH": "D:\\Projects\\hyper-rag",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

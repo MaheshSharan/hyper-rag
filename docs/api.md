@@ -97,4 +97,4 @@ Integrate /ingest into your project setup workflow. Monitor the progress field t
 For code-heavy searches, increase graph_score. For keyword-heavy legacy documentation, increase bm25_score. The system defaults are optimized for modern codebases (0.35 Rerank, 0.25 Vector, 0.25 BM25, 0.15 Graph).
 
 ---
-© 2026 HyperRAG | Precision-Engineered.
+© 2026 HyperRAG

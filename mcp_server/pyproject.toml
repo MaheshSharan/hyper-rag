@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyper-rag-mcp"
+version = "1.0.0"
+description = "Production-grade MCP server for HyperRAG — Hybrid RAG backend"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+
+dependencies = [
+    "mcp>=1.0.0",
+    "anyio>=4.0",
+]
+
+[project.scripts]
+hyper-rag-mcp = "hyper_rag_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hyper_rag_mcp*"]
