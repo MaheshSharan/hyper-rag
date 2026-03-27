@@ -7,6 +7,7 @@ Production-grade, headless hybrid RAG backend designed for IDE Intelligence, cod
 ## Key Features
 
 - **Quad-Hybrid Retrieval:** Combines BM25, Vector Search, Knowledge Graph, and PageIndex tree-search into a single fusion engine.
+- **Fast Project Summarization:** Instant codebase understanding WITHOUT indexing — tech stack detection, structure analysis, and optional LLM-powered insights in ~3 seconds.
 - **Universal Code Indexing:** Advanced relationship extraction for any codebase using Tree-Sitter AST Traversal (captures imports, calls, and definitions).
 - **NVIDIA NIM Integration:** Powered by llama-3.2-nv-embedqa (Embeddings) and llama-3.2-nv-rerankqa (Reranking) for high-precision retrieval.
 - **Dynamic Truth Layer:** Neo4j stores architectural relationships for deeper context beyond simple text similarity.
@@ -26,22 +27,7 @@ HyperRAG uses a "Relevance-First" architecture, moving beyond simple similarity 
 4. **Fusion:** Cross-encoder reranking followed by configurable weighted fusion.
 5. **Generation:** SSE streaming with interleaved reasoning/thinking tokens from advanced LLM providers.
 
-```mermaid
-graph TD
-    A[Codebase/Docs] --> B{Tree-Sitter / Parser}
-    B -->|AST| C[Neo4j Graph]
-    B -->|Chunks| D[OpenSearch BM25]
-    B -->|Embed| E[Qdrant Vector]
-    
-    Q[User Query] --> F{Orchestrator}
-    F --> C & D & E
-    
-    C & D & E --> G[NVIDIA Reranker]
-    G --> H[Weighted Fusion Engine]
-    H --> I[Context Builder]
-    I --> J[Advanced Thinking LLM]
-    J --> Out[Streaming SSE Response]
-```
+![HyperRAG Architecture](docs/architecture.png)
 
 ---
 
@@ -87,6 +73,7 @@ Fine-tune the relevance model via the /query API using the weights object. Defau
 
 | Feature | Endpoint | Description |
 |---|---|---|
+| Summarize | POST /summarize | Fast project analysis without indexing (~3s). Tech stack, structure, key files. |
 | Query | POST /query | Streaming SSE with optional weights and thinking tokens. |
 | Ingest | POST /ingest | Scoped folder ingestion with progress updates. |
 | Health | GET /health | Check service status and LLM availability. |

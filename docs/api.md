@@ -46,7 +46,54 @@ If using a thinking-capable LLM, the stream will include reasoning-tokens interl
 
 ---
 
-### 2. Live Ingestion
+### 2. Fast Project Summarization
+`POST /summarize`
+
+Analyzes a project folder WITHOUT indexing to provide instant codebase understanding. Returns tech stack, structure, key files, and optional LLM-powered insights. Results are cached in `data/processed/{project}/_project_summary.json`.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `folder_path` | `string` | **Required** | The absolute path to the project directory. |
+| `max_files` | `int` | `30` | Maximum number of key files to analyze in detail. |
+| `include_llm_analysis` | `bool` | `False` | Generate LLM-powered intelligent analysis (adds 20-30s). |
+
+#### **Example Request:**
+```json
+{
+  "folder_path": "D:/Projects/my-app",
+  "max_files": 30,
+  "include_llm_analysis": false
+}
+```
+
+#### **Response:**
+```json
+{
+  "project_name": "my-app",
+  "project_path": "D:/Projects/my-app",
+  "total_files": 156,
+  "tech_stack": {
+    "languages": ["JavaScript", "TypeScript"],
+    "frameworks": ["React", "Express"],
+    "dependencies": ["react", "express", "axios", "..."],
+    "package_managers": ["npm/yarn"],
+    "build_tools": ["webpack"]
+  },
+  "structure": {
+    "top_level_folders": ["src", "public", "tests"],
+    "file_types": {".js": 45, ".ts": 32, ".json": 12}
+  },
+  "key_files": [...],
+  "readme_content": "# My App\n...",
+  "llm_analysis": null
+}
+```
+
+**Performance:** ~3 seconds without LLM, ~25 seconds with LLM analysis enabled.
+
+---
+
+### 3. Live Ingestion
 `POST /ingest`
 
 Scans a folder and builds the multi-index project scope. Files are automatically organized into project-scoped subfolders under data/processed/{folder_name}/.
@@ -69,7 +116,7 @@ Returns a stream of progress status events:
 
 ---
 
-### 3. Service Health Check
+### 4. Service Health Check
 `GET /health`
 
 Checks the status of the RAG engine and its connected LLM provider.

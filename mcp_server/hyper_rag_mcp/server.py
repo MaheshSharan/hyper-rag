@@ -41,6 +41,7 @@ from src.retrieval.retrieval_orchestrator import RetrievalOrchestrator
 from src.retrieval.context_builder import ContextBuilder
 from src.generation.generator import LLMGenerator
 from src.ingestion.pipeline import IngestionPipeline
+from src.analysis.project_summarizer import ProjectSummarizer
 from src.indexing.qdrant_index import QdrantIndexer
 from src.indexing.opensearch_index import OpenSearchIndexer
 from src.indexing.neo4j_graph import Neo4jGraphBuilder
@@ -273,6 +274,48 @@ async def list_tools() -> list[types.Tool]:
                 "required": [],
             },
         ),
+        
+        types.Tool(
+            name="summarize_project",
+            description=(
+                "⚡ FAST project summarization WITHOUT indexing. "
+                "Analyzes raw files to provide instant codebase understanding in ~3 seconds. "
+                "Optionally generates LLM-powered insights (adds 20-30s but provides deep intelligence). "
+                "Caches results in data/processed/{project}/_project_summary.json for reuse.\n\n"
+                "Use this when you want to:\n"
+                "  • Quickly understand a new codebase structure\n"
+                "  • Get project context before indexing\n"
+                "  • See tech stack and architecture overview\n"
+                "  • Identify entry points and important files"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "folder_path": {
+                        "type": "string",
+                        "description": "Absolute path to the project folder to summarize. E.g. D:/Projects/my-app",
+                    },
+                    "max_files": {
+                        "type": "integer",
+                        "description": "Maximum number of key files to analyze in detail (default: 30).",
+                        "default": 30,
+                        "minimum": 10,
+                        "maximum": 100,
+                    },
+                    "include_llm_analysis": {
+                        "type": "boolean",
+                        "description": "Generate LLM-powered intelligent analysis (default: false). Adds 20-30s but provides deep insights about architecture and patterns.",
+                        "default": False,
+                    },
+                    "force_refresh": {
+                        "type": "boolean",
+                        "description": "Force regeneration even if cached summary exists (default: false).",
+                        "default": False,
+                    },
+                },
+                "required": ["folder_path"],
+            },
+        ),
     ]
 
 
@@ -299,6 +342,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
             return await _handle_wipe(arguments)
         elif name == "get_metrics":
             return await _handle_metrics()
+        elif name == "summarize_project":
+            return await _handle_summarize(arguments)
         else:
             return [types.TextContent(type="text", text=f"❌ Unknown tool: {name}")]
 
@@ -685,6 +730,121 @@ async def _handle_metrics() -> list[types.TextContent]:
         )
     
     return [types.TextContent(type="text", text="\n".join(lines))]
+
+
+async def _handle_summarize(args: dict) -> list[types.TextContent]:
+    """Fast project summarization with optional LLM intelligence"""
+    folder_path = args["folder_path"]
+    max_files = int(args.get("max_files", 30))
+    include_llm_analysis = bool(args.get("include_llm_analysis", False))
+    force_refresh = bool(args.get("force_refresh", False))
+    
+    folder = Path(folder_path).resolve()
+    if not folder.exists():
+        return [types.TextContent(type="text", text=f"❌ Folder not found: `{folder_path}`")]
+    
+    logger.info(f"Starting {'LLM-powered' if include_llm_analysis else 'fast'} summarization for: {folder}")
+    
+    try:
+        summarizer = ProjectSummarizer(str(folder))
+        summary = summarizer.summarize(
+            max_files_to_analyze=max_files,
+            use_cache=not force_refresh,
+            include_llm_analysis=include_llm_analysis
+        )
+        
+        # Build formatted response
+        lines = [
+            f"# ⚡ Project Summary — `{summary['project_name']}`",
+            f"",
+            f"**Path:** `{summary['project_path']}`  ",
+            f"**Total Files:** {summary['total_files']}  ",
+            f"**Key Files Analyzed:** {len(summary['key_files'])}",
+        ]
+        
+        # Check if this was from cache
+        cache_path = _PROJECT_ROOT / "data" / "processed" / summary['project_name'] / "_project_summary.json"
+        if not force_refresh and cache_path.exists():
+            lines.append(f"**Source:** 💾 Cached (use `force_refresh: true` to regenerate)")
+        
+        lines.append("")
+        
+        # Tech Stack
+        tech = summary["tech_stack"]
+        lines.append("## 🛠️ Tech Stack\n")
+        
+        if tech["languages"]:
+            lines.append(f"**Languages:** {', '.join(tech['languages'])}")
+        if tech["frameworks"]:
+            lines.append(f"**Frameworks:** {', '.join(tech['frameworks'])}")
+        if tech["package_managers"]:
+            lines.append(f"**Package Managers:** {', '.join(tech['package_managers'])}")
+        if tech["build_tools"]:
+            lines.append(f"**Build Tools:** {', '.join(tech['build_tools'])}")
+        if tech["dependencies"]:
+            lines.append(f"**Key Dependencies:** {', '.join(tech['dependencies'][:8])}")
+        
+        lines.append("")
+        
+        # Project Structure
+        structure = summary["structure"]
+        lines.append("## 📁 Project Structure\n")
+        
+        if structure["top_level_folders"]:
+            lines.append(f"**Top-Level Folders:** {', '.join(structure['top_level_folders'][:15])}")
+        
+        if structure["file_types"]:
+            lines.append("\n**File Types:**")
+            for ext, count in list(structure["file_types"].items())[:10]:
+                lines.append(f"  - `{ext}`: {count} files")
+        
+        lines.append("")
+        
+        # Key Files
+        lines.append("## 🔑 Key Files\n")
+        
+        for i, file_info in enumerate(summary["key_files"][:15], 1):
+            lines.append(f"### {i}. `{file_info['path']}`")
+            lines.append(f"**Type:** {file_info['type']} | **Size:** {file_info['size']} bytes")
+            
+            if "structure" in file_info:
+                struct = file_info["structure"]
+                if struct.get("classes"):
+                    lines.append(f"**Classes:** {', '.join(struct['classes'][:5])}")
+                if struct.get("functions"):
+                    lines.append(f"**Functions:** {', '.join(struct['functions'][:5])}")
+                if struct.get("imports"):
+                    lines.append(f"**Imports:** {', '.join(struct['imports'][:5])}")
+            
+            elif "preview" in file_info:
+                preview = file_info["preview"][:200]
+                lines.append(f"\n```\n{preview}{'...' if len(file_info['preview']) > 200 else ''}\n```")
+            
+            lines.append("")
+        
+        # README
+        if summary["readme_content"]:
+            lines.append("## 📖 README\n")
+            lines.append("```markdown")
+            lines.append(summary["readme_content"])
+            lines.append("```")
+            lines.append("")
+        
+        # LLM Analysis
+        if summary.get("llm_analysis"):
+            lines.append("## 🤖 LLM Intelligent Analysis\n")
+            lines.append(summary["llm_analysis"])
+            lines.append("")
+        
+        lines.append("---")
+        lines.append(f"*⚡ Smart summary generated without indexing — Ready for `ingest_folder` when needed*")
+        
+        logger.info(f"Summary complete for {folder.name}")
+        return [types.TextContent(type="text", text="\n".join(lines))]
+    
+    except Exception as e:
+        logger.exception(f"Summarization failed for {folder_path}")
+        return [types.TextContent(type="text", text=f"❌ Summarization error: {e}")]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ENTRY POINT

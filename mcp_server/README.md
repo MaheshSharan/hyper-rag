@@ -6,16 +6,18 @@ Production-grade [Model Context Protocol](https://modelcontextprotocol.io) serve
 
 ## What This Does
 
-Once installed, Claude Desktop can call six tools against your HyperRAG instance:
+Once installed, Claude Desktop can call eight tools against your HyperRAG instance:
 
 | Tool | Description |
 |---|---|
 | `query_codebase` | Full hybrid RAG query — BM25 + Vector + Graph + PageIndex + NVIDIA reranking |
 | `ingest_folder` | Index any project folder into all three stores (Qdrant, OpenSearch, Neo4j) |
+| `summarize_project` | ⚡ Fast project analysis WITHOUT indexing — tech stack, structure, key files (~3s, optional LLM insights) |
 | `get_retrieval_chunks` | Raw ranked chunks with per-retriever scores — great for debugging |
 | `check_health` | Live health check of all services (Qdrant, OpenSearch, Neo4j, LLM) |
 | `list_indexed_projects` | Show all ingested projects with chunk counts |
 | `wipe_project_index` | ⚠️ Full wipe of all indexes (requires `confirm: true`) |
+| `get_metrics` | Performance metrics and statistics about retrieval operations |
 
 ---
 
@@ -69,6 +71,9 @@ Add this to `%APPDATA%\Claude\claude_desktop_config.json`:
 
 Once connected, ask Claude Desktop naturally:
 
+> *"Summarize the project at D:/Projects/my-app"*  
+> → Calls `summarize_project` (fast, no indexing needed)
+
 > *"Ingest my project at D:/Projects/my-app"*  
 > → Calls `ingest_folder`
 
@@ -80,6 +85,9 @@ Once connected, ask Claude Desktop naturally:
 
 > *"Show me the raw retrieval scores for the query: database connection pooling"*  
 > → Calls `get_retrieval_chunks`
+
+> *"Show me performance metrics"*  
+> → Calls `get_metrics`
 
 ---
 

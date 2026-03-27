@@ -64,6 +64,23 @@ class LLMGenerator:
         except Exception as e:
             logger.error(f"Unexpected LLM error: {e}", exc_info=True)
             return "Sorry, I encountered an error while generating the answer."
+    
+    def generate_sync(self, query: str, context: str) -> str:
+        """Synchronous wrapper for generate() - for non-async contexts"""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is already running, create a new one
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.generate(query, context))
+                    return future.result()
+            else:
+                return loop.run_until_complete(self.generate(query, context))
+        except Exception as e:
+            logger.error(f"Sync generation error: {e}")
+            return f"Error: {str(e)}"
 
     async def generate_stream(self, query: str, context: str) -> AsyncGenerator[str, None]:
         """Streaming generation - yields token by token (OpenAI/NVIDIA compatible)"""

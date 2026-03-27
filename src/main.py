@@ -21,6 +21,7 @@ from src.retrieval.retrieval_orchestrator import RetrievalOrchestrator
 from src.retrieval.context_builder import ContextBuilder
 from src.generation.generator import LLMGenerator
 from src.ingestion.pipeline import IngestionPipeline
+from src.analysis.project_summarizer import ProjectSummarizer
 from src.config.settings import settings
 
 # ====================== PRO LOGGING ======================
@@ -70,6 +71,11 @@ class QueryRequest(BaseModel):
 
 class IngestRequest(BaseModel):
     folder_path: str
+
+class SummarizeRequest(BaseModel):
+    folder_path: str
+    max_files: int = 30
+    include_llm_analysis: bool = False  # Default FALSE like other tools
 
 # ====================== SERVICES ======================
 orchestrator = RetrievalOrchestrator()
@@ -175,6 +181,30 @@ async def query_endpoint(request: QueryRequest):
 @app.post("/ingest")
 async def ingest_endpoint(request: IngestRequest):
     return StreamingResponse(stream_ingest_response(request.folder_path), media_type="text/event-stream")
+
+@app.post("/summarize")
+async def summarize_endpoint(request: SummarizeRequest):
+    """Fast project summarization with optional LLM intelligence"""
+    try:
+        folder = Path(request.folder_path)
+        if not folder.exists():
+            raise HTTPException(400, f"Folder not found: {request.folder_path}")
+        
+        logger.info(Fore.CYAN + f"📊 Summarizing project: {folder.name}")
+        
+        summarizer = ProjectSummarizer(str(folder))
+        summary = summarizer.summarize(
+            max_files_to_analyze=request.max_files,
+            include_llm_analysis=request.include_llm_analysis
+        )
+        
+        logger.info(Fore.GREEN + f"✅ Summary complete: {summary['total_files']} files analyzed")
+        
+        return summary
+    
+    except Exception as e:
+        logger.error(f"Summarization failed: {e}")
+        raise HTTPException(500, f"Summarization error: {str(e)}")
 
 @app.get("/health")
 async def health():

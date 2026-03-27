@@ -2,6 +2,7 @@
 fastapi
 uvicorn[standard]
 pydantic>=2.0
+pydantic-settings
 python-dotenv
 aiohttp
 asyncio
@@ -17,6 +18,7 @@ tree-sitter-javascript
 pymupdf
 markdown-it-py
 beautifulsoup4
+tomli  # For parsing pyproject.toml in Python < 3.11
 
 # --- Vector & Keyword Search ---
 qdrant-client
